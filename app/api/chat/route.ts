@@ -71,6 +71,22 @@ const updateTaskDeclaration: FunctionDeclaration = {
   },
 };
 
+const deleteTaskDeclaration: FunctionDeclaration = {
+  name: "delete_task",
+  description: "یک تسک موجود رو کاملاً حذف می‌کنه (نه انجام‌شده علامت زدن — واقعاً از لیست پاکش می‌کنه).",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      titleSearch: { type: "string", description: "بخشی از عنوان تسکی که باید حذف بشه" },
+      nearDate: {
+        type: "string",
+        description: "تاریخ تقریبی تسک برای کمک به پیدا کردنش، فرمت YYYY-MM-DD میلادی (اختیاری)",
+      },
+    },
+    required: ["titleSearch"],
+  },
+};
+
 const listHabitsDeclaration: FunctionDeclaration = {
   name: "list_habits",
   description: "لیست عادت‌های کاربر رو برمی‌گردونه.",
@@ -100,6 +116,32 @@ const logHabitDeclaration: FunctionDeclaration = {
       completed: { type: "boolean", description: "انجام شده (true) یا نشده (false)" },
     },
     required: ["nameSearch", "date", "completed"],
+  },
+};
+
+const updateHabitDeclaration: FunctionDeclaration = {
+  name: "update_habit",
+  description: "اسم یا رنگ یک عادت موجود رو تغییر می‌ده.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      nameSearch: { type: "string", description: "بخشی از اسم فعلی عادت" },
+      newName: { type: "string", description: "اسم جدید (اختیاری)" },
+      newColor: { type: "string", description: "کد رنگ هگز جدید مثل #2563eb (اختیاری)" },
+    },
+    required: ["nameSearch"],
+  },
+};
+
+const deleteHabitDeclaration: FunctionDeclaration = {
+  name: "delete_habit",
+  description: "یک عادت رو کاملاً حذف می‌کنه (همراه با تاریخچه انجامش).",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      nameSearch: { type: "string", description: "بخشی از اسم عادتی که باید حذف بشه" },
+    },
+    required: ["nameSearch"],
   },
 };
 
@@ -133,6 +175,18 @@ const updateGoalProgressDeclaration: FunctionDeclaration = {
       progress: { type: "number", description: "درصد پیشرفت جدید، عددی بین ۰ تا ۱۰۰" },
     },
     required: ["titleSearch", "progress"],
+  },
+};
+
+const deleteGoalDeclaration: FunctionDeclaration = {
+  name: "delete_goal",
+  description: "یک هدف رو کاملاً حذف می‌کنه.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      titleSearch: { type: "string", description: "بخشی از عنوان هدفی که باید حذف بشه" },
+    },
+    required: ["titleSearch"],
   },
 };
 
@@ -197,10 +251,39 @@ async function executeTool(userId: string, name: string, args: Record<string, un
     const startTime = typeof args.startTime === "string" && timeRe.test(args.startTime) ? args.startTime : undefined;
     const endTime = typeof args.endTime === "string" && timeRe.test(args.endTime) ? args.endTime : undefined;
 
+    // Idempotency guard: models occasionally call this tool twice for one user
+    // request (same round or a retried round). If an identical task was just
+    // created for this exact title+date, return it instead of duplicating.
+    const existing = await prisma.task.findFirst({
+      where: { userId, title, date: dayRangeForKey(date) },
+    });
+    if (existing) {
+      return { success: true, alreadyExisted: true, task: { id: existing.id, title: existing.title, date } };
+    }
+
     const task = await prisma.task.create({
       data: { userId, title, date: dayRangeForKey(date).gte, priority, startTime, endTime },
     });
     return { success: true, task: { id: task.id, title: task.title, date } };
+  }
+
+  if (name === "delete_task") {
+    const titleSearch = String(args.titleSearch ?? "").trim();
+    if (!titleSearch) return { error: "عنوان جستجو نامعتبر است." };
+
+    const nearDate = typeof args.nearDate === "string" && isValidDateKey(args.nearDate) ? args.nearDate : undefined;
+    const task = await prisma.task.findFirst({
+      where: {
+        userId,
+        title: { contains: titleSearch },
+        ...(nearDate ? { date: dayRangeForKey(nearDate) } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!task) return { error: "تسکی با این عنوان پیدا نشد." };
+
+    await prisma.task.delete({ where: { id: task.id } });
+    return { success: true, deletedTitle: task.title };
   }
 
   if (name === "update_task") {
@@ -268,6 +351,35 @@ async function executeTool(userId: string, name: string, args: Record<string, un
     return { success: true, habit: habit.name, date, completed };
   }
 
+  if (name === "update_habit") {
+    const nameSearch = String(args.nameSearch ?? "").trim();
+    if (!nameSearch) return { error: "اسم جستجو نامعتبر است." };
+
+    const habit = await prisma.habit.findFirst({ where: { userId, name: { contains: nameSearch } } });
+    if (!habit) return { error: "عادتی با این اسم پیدا نشد." };
+
+    const newName = typeof args.newName === "string" ? args.newName.trim() : undefined;
+    const newColor =
+      typeof args.newColor === "string" && /^#[0-9a-fA-F]{6}$/.test(args.newColor) ? args.newColor : undefined;
+
+    const updated = await prisma.habit.update({
+      where: { id: habit.id },
+      data: { name: newName || undefined, color: newColor },
+    });
+    return { success: true, habit: { name: updated.name, color: updated.color } };
+  }
+
+  if (name === "delete_habit") {
+    const nameSearch = String(args.nameSearch ?? "").trim();
+    if (!nameSearch) return { error: "اسم جستجو نامعتبر است." };
+
+    const habit = await prisma.habit.findFirst({ where: { userId, name: { contains: nameSearch } } });
+    if (!habit) return { error: "عادتی با این اسم پیدا نشد." };
+
+    await prisma.habit.delete({ where: { id: habit.id } });
+    return { success: true, deletedName: habit.name };
+  }
+
   if (name === "list_goals") {
     const goals = await prisma.goal.findMany({ where: { userId }, orderBy: { createdAt: "desc" } });
     return { goals: goals.map((g) => ({ title: g.title, type: g.type, progress: g.progress })) };
@@ -286,6 +398,17 @@ async function executeTool(userId: string, name: string, args: Record<string, un
       data: { userId, title, type, targetDate: targetDate ? dayRangeForKey(targetDate).gte : undefined },
     });
     return { success: true, goal: { title: goal.title, type: goal.type } };
+  }
+
+  if (name === "delete_goal") {
+    const titleSearch = String(args.titleSearch ?? "").trim();
+    if (!titleSearch) return { error: "عنوان جستجو نامعتبر است." };
+
+    const goal = await prisma.goal.findFirst({ where: { userId, title: { contains: titleSearch } } });
+    if (!goal) return { error: "هدفی با این عنوان پیدا نشد." };
+
+    await prisma.goal.delete({ where: { id: goal.id } });
+    return { success: true, deletedTitle: goal.title };
   }
 
   if (name === "update_goal_progress") {
@@ -339,6 +462,8 @@ export async function POST(request: NextRequest) {
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const today = todayKey();
+  const now = new Date();
+  const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
   const contents: Content[] = parsed.data.messages.map((m) => ({
     role: m.role,
@@ -347,12 +472,18 @@ export async function POST(request: NextRequest) {
 
   const systemInstruction = [
     "تو دستیار هوشمند یه اپ برنامه‌ریز فارسی‌زبان هستی. فقط فارسی جواب بده، مختصر و دوستانه.",
-    `امروز ${formatJalaliWeekdayLong(today)}، ${formatJalaliLong(today)} شمسیه (میلادی: ${today}).`,
+    `امروز ${formatJalaliWeekdayLong(today)}، ${formatJalaliLong(today)} شمسیه (میلادی: ${today})، و ساعت الان دقیقاً ${nowTime} است.`,
     `تاریخ‌های نسبی مثل «فردا» یا «پس‌فردا» رو بر اساس تاریخ میلادی امروز (${today}) محاسبه کن و همون فرمت YYYY-MM-DD میلادی رو به ابزارها بده — چون تقویم برنامه‌ریز داخلاً میلادیه.`,
+    `عبارت‌های نسبی زمانی مثل «۵ دقیقه دیگه»، «ده دقیقه دیگه»، «یک ربع دیگه» (= ۱۵ دقیقه)، «نیم ساعت دیگه» (= ۳۰ دقیقه)، «یک ساعت دیگه» رو دقیقاً با جمع‌زدن روی ساعت الان (${nowTime}) محاسبه کن و فرمت HH:mm بده — هیچ‌وقت این محاسبه رو تقریبی یا حدسی انجام نده.`,
     "هرگز خودت تاریخ شمسی رو با محاسبه دستی به کاربر نگو، چون احتمال اشتباه داری. تو جواب‌هات برای اشاره به تاریخ فقط از عبارت‌های نسبی مثل «فردا»، «پس‌فردا» یا اسم روز هفته (که تو ابزار list_tasks برات مشخصه) استفاده کن، نه یه عدد شمسی ساخته‌شده توسط خودت.",
-    "علاوه بر تسک‌های روزانه (که با create_task/update_task/list_tasks مدیریت می‌شن)، به این بخش‌های اپ هم دسترسی داری: عادت‌ها (list_habits, create_habit, log_habit)، اهداف (list_goals, create_goal, update_goal_progress)، و یادداشت روزانه (write_journal_entry).",
+    "علاوه بر تسک‌های روزانه (که با create_task/update_task/delete_task/list_tasks مدیریت می‌شن)، به این بخش‌های اپ هم دسترسی کامل داری: عادت‌ها (list_habits, create_habit, update_habit, delete_habit, log_habit)، اهداف (list_goals, create_goal, update_goal_progress, delete_goal)، و یادداشت روزانه (write_journal_entry).",
+    "اگه کاربر سؤالی عمومی پرسید که به اطلاعات روز یا اینترنت نیاز داره (اخبار، قیمت، اطلاعات عمومی)، از قابلیت جستجوی وب استفاده کن تا جواب به‌روز و درست بدی، نه از حافظه‌ات.",
+    "تو فقط محدود به کارهای برنامه‌ریز نیستی — هر سؤال عمومی دیگه‌ای هم (غیر از پلنر) پرسیده بشه، عادی و کامل جوابش رو بده، مثل یه دستیار هوشمند همه‌کاره.",
+    "هیچ‌وقت رمز عبور، ایمیل حساب، یا هر تنظیمات امنیتی حساب کاربری رو تغییر نده یا پیشنهاد نده — این کارها فقط باید مستقیم توسط خود کاربر از تنظیمات انجام بشه.",
     "نمای هفتگی و ماهانه برنامه‌ریز، فقط یه شکل دیگه از همون تسک‌هاست — برای ساختن تسک تو هر روزی از هفته یا ماه، فقط کافیه create_task رو با همون تاریخ صدا بزنی، ابزار جدایی لازم نیست.",
-    "وقتی کاربر ازت می‌خواد کاری رو تو هر کدوم از این بخش‌ها انجام بدی (بسازی، تغییر بدی، علامت بزنی)، از ابزار مناسبش استفاده کن — پیشنهاد صرفاً متنی ندی، واقعاً انجامش بده. قبل از ساختن، اگه لازمه از list_tasks/list_habits/list_goals برای دیدن وضعیت فعلی استفاده کن. در جواب نهایی همیشه تأیید کن دقیقاً چیکار کردی.",
+    "مهم: «حذف کن» یا «پاکش کن» با «انجام‌شده/تیک‌زده کن» کاملاً فرق دارن. اگه کاربر گفت یه تسک رو حذف کن یا پاک کن، از delete_task استفاده کن (که واقعاً پاکش می‌کنه). فقط وقتی گفت انجامش دادم یا تمومش کردم، از update_task با completed:true استفاده کن. این دوتا رو هیچ‌وقت با هم قاطی نکن.",
+    "هر ابزار (مخصوصاً create_task) رو برای یه درخواست کاربر فقط یه‌بار صدا بزن. اگه قبلاً تو همین گفتگو یه تسک/عادت/هدف با همین مشخصات ساختی، دوباره نسازش.",
+    "وقتی کاربر ازت می‌خواد کاری رو تو هر کدوم از این بخش‌ها انجام بدی (بسازی، تغییر بدی، علامت بزنی، حذف کنی)، از ابزار مناسبش استفاده کن — پیشنهاد صرفاً متنی ندی، واقعاً انجامش بده. قبل از ساختن، اگه لازمه از list_tasks/list_habits/list_goals برای دیدن وضعیت فعلی استفاده کن. در جواب نهایی همیشه تأیید کن دقیقاً چیکار کردی.",
     "اگه ابزاری برای پیدا کردن یه تسک/عادت/هدف با اسمش نتیجه‌ای برنگردوند (پیدا نشد)، اینو صادقانه به کاربر بگو و ازش بخواه اسم دقیق‌تری بگه، خودت چیزی نساز که درخواست نشده.",
   ].join(" ");
 
@@ -376,15 +507,20 @@ export async function POST(request: NextRequest) {
                     listTasksDeclaration,
                     createTaskDeclaration,
                     updateTaskDeclaration,
+                    deleteTaskDeclaration,
                     listHabitsDeclaration,
                     createHabitDeclaration,
+                    updateHabitDeclaration,
+                    deleteHabitDeclaration,
                     logHabitDeclaration,
                     listGoalsDeclaration,
                     createGoalDeclaration,
                     updateGoalProgressDeclaration,
+                    deleteGoalDeclaration,
                     writeJournalEntryDeclaration,
                   ],
                 },
+                { googleSearch: {} },
               ],
             },
           });
@@ -415,7 +551,8 @@ export async function POST(request: NextRequest) {
       }
       contents.push({ role: "user", parts: responseParts });
     }
-  } catch {
+  } catch (err) {
+    console.error("[chat] Gemini error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
       { error: "سرویس هوش مصنوعی الان شلوغه یا در دسترس نیست. چند لحظه دیگه دوباره امتحان کن." },
       { status: 503 }
