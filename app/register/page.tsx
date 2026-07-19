@@ -2,9 +2,11 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { Mail, User } from "lucide-react";
 import { signup } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth-shell";
 import {
@@ -29,21 +31,33 @@ export default function RegisterPage() {
           <form action={action} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">نام</Label>
-              <Input id="name" name="name" placeholder="نام شما" />
+              <div className="relative">
+                <User className="pointer-events-none absolute inset-y-0 inset-s-3 my-auto size-4 text-muted-foreground" />
+                <Input id="name" name="name" placeholder="نام شما" className="ps-9" />
+              </div>
               {state?.errors?.name && (
                 <p className="text-sm text-destructive">{state.errors.name[0]}</p>
               )}
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">ایمیل</Label>
-              <Input id="email" name="email" type="email" placeholder="you@example.com" />
+              <div className="relative">
+                <Mail className="pointer-events-none absolute inset-y-0 inset-s-3 my-auto size-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  className="ps-9"
+                />
+              </div>
               {state?.errors?.email && (
                 <p className="text-sm text-destructive">{state.errors.email[0]}</p>
               )}
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="password">رمز عبور</Label>
-              <Input id="password" name="password" type="password" />
+              <PasswordInput id="password" name="password" />
               {state?.errors?.password && (
                 <ul className="text-sm text-destructive">
                   {state.errors.password.map((error) => (

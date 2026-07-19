@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { resetPassword } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth-shell";
 import {
@@ -35,7 +35,7 @@ function ResetPasswordForm() {
     <form action={action} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">رمز عبور جدید</Label>
-        <Input id="password" name="password" type="password" />
+        <PasswordInput id="password" name="password" />
         {state?.errors?.password && (
           <p className="text-sm text-destructive">{state.errors.password[0]}</p>
         )}

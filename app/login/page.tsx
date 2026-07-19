@@ -2,9 +2,11 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { Mail } from "lucide-react";
 import { login } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth-shell";
 import {
@@ -29,7 +31,16 @@ export default function LoginPage() {
           <form action={action} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">ایمیل</Label>
-              <Input id="email" name="email" type="email" placeholder="you@example.com" />
+              <div className="relative">
+                <Mail className="pointer-events-none absolute inset-y-0 inset-s-3 my-auto size-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  className="ps-9"
+                />
+              </div>
               {state?.errors?.email && (
                 <p className="text-sm text-destructive">{state.errors.email[0]}</p>
               )}
@@ -41,7 +52,7 @@ export default function LoginPage() {
                   رمزت یادت رفته؟
                 </Link>
               </div>
-              <Input id="password" name="password" type="password" />
+              <PasswordInput id="password" name="password" />
               {state?.errors?.password && (
                 <p className="text-sm text-destructive">{state.errors.password[0]}</p>
               )}
