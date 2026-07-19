@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, ChevronLeft } from "lucide-react";
+import { ChevronRight, ChevronLeft, NotebookPen } from "lucide-react";
 import { getCurrentUser } from "@/lib/dal";
 import { addDaysToKey, isValidDateKey, todayKey } from "@/lib/date";
 import { formatJalaliLong, formatJalaliWeekdayLong } from "@/lib/jalali";
@@ -18,7 +18,10 @@ export default async function JournalDayPage(props: PageProps<"/journal/[date]">
       <AppHeader userName={user?.name} />
 
       <main className="mx-auto w-full max-w-2xl flex-1 p-4 sm:p-8">
-        <h1 className="mb-3 text-lg font-medium">یادداشت روزانه</h1>
+        <h1 className="mb-3 flex items-center gap-2 font-heading text-lg font-semibold">
+          <NotebookPen className="size-5 text-primary" />
+          یادداشت روزانه
+        </h1>
 
         <div className="flex items-center justify-between">
           <Button

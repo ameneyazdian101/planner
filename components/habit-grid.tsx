@@ -100,7 +100,7 @@ export function HabitGrid() {
       {isLoading && <p className="text-sm text-muted-foreground">در حال بارگذاری...</p>}
 
       {habits && habits.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-xl border border-border/60 bg-card p-2 shadow-[0_1px_2px_color-mix(in_oklch,var(--foreground)_5%,transparent),0_8px_20px_-12px_color-mix(in_oklch,var(--foreground)_18%,transparent)]">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr>

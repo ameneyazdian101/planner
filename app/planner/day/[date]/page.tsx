@@ -34,7 +34,7 @@ export default async function DayPlannerPage(props: PageProps<"/planner/day/[dat
           />
           <div className="text-center">
             <p className="text-sm text-muted-foreground">{formatJalaliWeekdayLong(date)}</p>
-            <h1 className="text-xl font-semibold">{formatJalaliLong(date)}</h1>
+            <h1 className="font-heading text-xl font-bold">{formatJalaliLong(date)}</h1>
           </div>
           <Button
             variant="ghost"

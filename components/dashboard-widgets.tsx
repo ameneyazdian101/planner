@@ -2,9 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Clock3, TrendingUp } from "lucide-react";
 import { dateKeyFromLocalDate, todayKey } from "@/lib/date";
 import { formatJalaliLong, formatJalaliWeekdayLong } from "@/lib/jalali";
 import { cn } from "@/lib/utils";
+
+const cardShadow =
+  "shadow-[0_1px_2px_color-mix(in_oklch,var(--foreground)_6%,transparent),0_8px_20px_-12px_color-mix(in_oklch,var(--foreground)_18%,transparent)]";
 
 export function ClockCard() {
   const [now, setNow] = useState<Date | null>(null);
@@ -35,13 +39,16 @@ export function ClockCard() {
   });
 
   return (
-    <div className="flex flex-col rounded-xl border p-4">
+    <div className={cn("flex flex-col rounded-xl border border-border/60 bg-card p-4", cardShadow)}>
       <div className="flex items-center justify-between">
-        <span className="text-3xl font-semibold tabular-nums">{time ?? "--:--:--"}</span>
+        <span className="flex items-center gap-2 font-heading text-3xl font-bold tabular-nums">
+          <Clock3 className="size-5 text-primary" />
+          {time ?? "--:--:--"}
+        </span>
         <button
           type="button"
           onClick={() => setCalendar((c) => (c === "jalali" ? "gregorian" : "jalali"))}
-          className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           {calendar === "jalali" ? "میلادی" : "شمسی"}
         </button>
@@ -73,10 +80,13 @@ export function DailyProgressCard() {
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
 
   return (
-    <div className="flex flex-col rounded-xl border p-4">
-      <p className="text-sm text-muted-foreground">پیشرفت امروز</p>
+    <div className={cn("flex flex-col rounded-xl border border-border/60 bg-card p-4", cardShadow)}>
+      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <TrendingUp className="size-3.5" />
+        پیشرفت امروز
+      </p>
       <div className="mt-1 flex items-end gap-2">
-        <span className="text-3xl font-semibold tabular-nums">{pct}٪</span>
+        <span className="font-heading text-3xl font-bold tabular-nums">{pct}٪</span>
         <span className="mb-1 text-xs text-muted-foreground">
           {total === 0 ? "بدون تسک" : `${done} از ${total} تسک`}
         </span>

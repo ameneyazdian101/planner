@@ -6,6 +6,7 @@ import { signup } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthShell } from "@/components/auth-shell";
 import {
   Card,
   CardContent,
@@ -18,7 +19,7 @@ export default function RegisterPage() {
   const [state, action, pending] = useActionState(signup, undefined);
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <AuthShell>
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>ساخت حساب کاربری</CardTitle>
@@ -66,6 +67,6 @@ export default function RegisterPage() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

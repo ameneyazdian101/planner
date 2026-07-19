@@ -36,7 +36,7 @@ export default async function WeekPlannerPage(props: PageProps<"/planner/week/[w
           }
         />
         <div className="text-center">
-          <h1 className="text-xl font-semibold">
+          <h1 className="font-heading text-xl font-bold">
             {formatJalaliLong(days[0])} تا {formatJalaliLong(days[6])}
           </h1>
         </div>

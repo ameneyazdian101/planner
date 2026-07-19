@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Plus } from "lucide-react";
+import { Clock, Flag, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,9 +39,9 @@ const priorityLabel: Record<Priority, string> = {
 };
 
 const priorityClass: Record<Priority, string> = {
-  LOW: "text-muted-foreground",
-  MEDIUM: "text-foreground",
-  HIGH: "text-destructive font-medium",
+  LOW: "bg-muted text-muted-foreground",
+  MEDIUM: "bg-accent text-accent-foreground",
+  HIGH: "bg-destructive/10 text-destructive",
 };
 
 const nextPriority: Record<Priority, Priority> = {
@@ -250,7 +250,7 @@ export function TaskList({
               e.dataTransfer.effectAllowed = "move";
             }}
             className={cn(
-              "flex items-center rounded-lg border",
+              "flex items-center rounded-lg border border-border/60 bg-card shadow-[0_1px_2px_color-mix(in_oklch,var(--foreground)_5%,transparent)]",
               compact ? "gap-1.5 p-1.5" : "gap-3 p-3",
               draggable && "cursor-grab active:cursor-grabbing",
               task.rescheduled
@@ -282,8 +282,9 @@ export function TaskList({
               {task.startTime && (
                 <span
                   dir="ltr"
-                  className="block text-right text-xs tabular-nums text-muted-foreground"
+                  className="mt-0.5 flex items-center justify-end gap-1 text-xs tabular-nums text-muted-foreground"
                 >
+                  <Clock className="size-3" />
                   {toPersianDigits(task.startTime)}
                   {task.endTime ? ` – ${toPersianDigits(task.endTime)}` : ""}
                 </span>
@@ -295,10 +296,14 @@ export function TaskList({
                 onClick={() =>
                   changePriority.mutate({ id: task.id, priority: nextPriority[task.priority] })
                 }
-                className={cn("shrink-0 text-xs hover:underline", priorityClass[task.priority])}
+                className={cn(
+                  "flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:opacity-80",
+                  priorityClass[task.priority]
+                )}
                 aria-label="تغییر اولویت"
                 title="برای تغییر اولویت کلیک کن"
               >
+                <Flag className="size-3" />
                 {priorityLabel[task.priority]}
               </button>
             )}

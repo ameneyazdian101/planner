@@ -18,15 +18,15 @@ export function PlannerNav({
   ] as const;
 
   return (
-    <div className="flex gap-1 rounded-lg border p-1">
+    <div className="flex gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
       {tabs.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
           className={cn(
-            "flex-1 rounded-md px-3 py-1.5 text-center text-sm transition-colors",
+            "flex-1 rounded-lg px-3 py-1.5 text-center text-sm font-medium transition-colors",
             current === tab.key
-              ? "bg-primary text-primary-foreground"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:bg-accent"
           )}
         >

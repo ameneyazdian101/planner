@@ -144,7 +144,10 @@ export function GoalList() {
             </h3>
             <ul className="flex flex-col gap-2">
               {items.map((goal) => (
-                <li key={goal.id} className="flex flex-col gap-2 rounded-lg border p-3">
+                <li
+                  key={goal.id}
+                  className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card p-3 shadow-[0_1px_2px_color-mix(in_oklch,var(--foreground)_5%,transparent)]"
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">{goal.title}</p>

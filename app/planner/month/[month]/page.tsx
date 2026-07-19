@@ -48,7 +48,7 @@ export default async function MonthPlannerPage(props: PageProps<"/planner/month/
             </Link>
           }
         />
-        <h1 className="text-xl font-semibold">{formatMonthLabel(month)}</h1>
+        <h1 className="font-heading text-xl font-bold">{formatMonthLabel(month)}</h1>
         <Button
           variant="ghost"
           size="icon"

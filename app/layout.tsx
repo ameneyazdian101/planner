@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans_Arabic } from "next/font/google";
+import { IBM_Plex_Sans_Arabic, Vazirmatn } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -9,13 +9,19 @@ const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
   weight: ["300", "400", "500", "600", "700"],
 });
 
+const vazirmatn = Vazirmatn({
+  variable: "--font-vazirmatn",
+  subsets: ["arabic", "latin"],
+  weight: ["600", "700", "800"],
+});
+
 export const metadata: Metadata = {
   title: "پلنر",
   description: "پلنر دیجیتال شخصی برای برنامه‌ریزی روزانه، اهداف و عادت‌ها",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#2c4a73",
 };
 
 export default function RootLayout({
@@ -24,7 +30,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fa" dir="rtl" className={`${ibmPlexSansArabic.variable} h-full antialiased`}>
+    <html
+      lang="fa"
+      dir="rtl"
+      suppressHydrationWarning
+      className={`${ibmPlexSansArabic.variable} ${vazirmatn.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
       </body>
