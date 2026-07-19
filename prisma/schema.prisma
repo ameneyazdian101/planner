@@ -18,10 +18,23 @@ model User {
   isAdmin      Boolean  @default(false)
   createdAt    DateTime @default(now())
 
-  tasks    Task[]
-  goals    Goal[]
-  habits   Habit[]
-  journals JournalEntry[]
+  tasks             Task[]
+  goals             Goal[]
+  habits            Habit[]
+  journals          JournalEntry[]
+  pushSubscriptions PushSubscription[]
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Task {
@@ -36,6 +49,7 @@ model Task {
   startTime   String?
   endTime     String?
   rescheduled Boolean   @default(false)
+  reminded    Boolean   @default(false)
   createdAt   DateTime  @default(now())
 
   @@index([userId, date])

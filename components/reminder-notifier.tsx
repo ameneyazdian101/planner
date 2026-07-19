@@ -1,81 +1,74 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Bell } from "lucide-react";
-import { todayKey } from "@/lib/date";
+import { useEffect, useState } from "react";
+import { Bell, BellRing } from "lucide-react";
 
-type Task = { id: string; title: string; startTime: string | null; completed: boolean };
-
-const CHECK_INTERVAL_MS = 30_000;
-const REMINDER_WINDOW_MINUTES = 2;
-
-function minutesSinceStart(startTime: string, now: Date): number {
-  const [h, m] = startTime.split(":").map(Number);
-  const startMinutes = h * 60 + m;
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  return nowMinutes - startMinutes;
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
-async function notify(title: string) {
-  if (!("serviceWorker" in navigator)) return;
+async function subscribeToPush(): Promise<boolean> {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!publicKey || !("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+
   const registration = await navigator.serviceWorker.ready;
-  registration.showNotification("یادآوری تسک", {
-    body: title,
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
-    tag: "task-reminder",
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+    });
+  }
+
+  const json = subscription.toJSON();
+  const res = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
   });
+  return res.ok;
 }
 
 export function ReminderNotifier() {
   const [permission, setPermission] = useState<NotificationPermission | null>(null);
-  const notifiedRef = useRef<Set<string>>(new Set());
+  const [subscribed, setSubscribed] = useState(false);
 
   useEffect(() => {
     if (typeof Notification === "undefined") return;
     setPermission(Notification.permission);
+    if (Notification.permission === "granted") {
+      subscribeToPush().then(setSubscribed);
+    }
   }, []);
 
-  useEffect(() => {
-    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-
-    const check = async () => {
-      try {
-        const res = await fetch(`/api/tasks?date=${todayKey()}`);
-        if (!res.ok) return;
-        const tasks: Task[] = await res.json();
-        const now = new Date();
-
-        for (const task of tasks) {
-          if (task.completed || !task.startTime || notifiedRef.current.has(task.id)) continue;
-          const diff = minutesSinceStart(task.startTime, now);
-          if (diff >= 0 && diff <= REMINDER_WINDOW_MINUTES) {
-            notifiedRef.current.add(task.id);
-            notify(task.title);
-          }
-        }
-      } catch {
-        // Reminders are a progressive enhancement; ignore transient failures.
-      }
-    };
-
-    check();
-    const interval = setInterval(check, CHECK_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [permission]);
-
-  const requestPermission = async () => {
+  const enable = async () => {
     if (typeof Notification === "undefined") return;
     const result = await Notification.requestPermission();
     setPermission(result);
+    if (result === "granted") {
+      setSubscribed(await subscribeToPush());
+    }
   };
 
-  if (permission === null || permission === "granted" || permission === "denied") return null;
+  if (permission === "denied") return null;
+  if (permission === "granted" && subscribed) {
+    return (
+      <span
+        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground"
+        title="یادآوری تسک‌ها فعاله"
+      >
+        <BellRing className="size-3.5" />
+      </span>
+    );
+  }
 
   return (
     <button
       type="button"
-      onClick={requestPermission}
+      onClick={enable}
       className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
       title="فعال‌سازی یادآوری تسک‌ها"
     >
