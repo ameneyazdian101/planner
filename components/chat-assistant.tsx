@@ -58,6 +58,7 @@ export function ChatAssistant() {
   const [speakEnabled, setSpeakEnabled] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const retryMessagesRef = useRef<Message[] | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -67,13 +68,11 @@ export function ChatAssistant() {
     setVoiceSupported(!!getSpeechRecognition());
   }, []);
 
-  async function send(overrideText?: string) {
-    const text = (overrideText ?? input).trim();
-    if (!text || pending) return;
+  function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 
-    const nextMessages = [...messages, { role: "user" as const, text }];
-    setMessages(nextMessages);
-    setInput("");
+  async function sendMessages(nextMessages: Message[], isRetry = false) {
     setPending(true);
     setError(null);
 
@@ -85,16 +84,46 @@ export function ChatAssistant() {
       });
       const data = await res.json();
       if (!res.ok) {
+        // Free-tier quota/rate-limit errors (503) are often transient — wait a moment
+        // and retry once automatically before bothering the user with an error.
+        if (res.status === 503 && !isRetry) {
+          await sleep(4000);
+          await sendMessages(nextMessages, true);
+          return;
+        }
+        retryMessagesRef.current = nextMessages;
         setError(data.error ?? "خطایی پیش اومد.");
         return;
       }
+      retryMessagesRef.current = null;
       setMessages([...nextMessages, { role: "model", text: data.text }]);
       if (speakEnabled) speak(data.text);
     } catch {
+      if (!isRetry) {
+        await sleep(4000);
+        await sendMessages(nextMessages, true);
+        return;
+      }
+      retryMessagesRef.current = nextMessages;
       setError("ارتباط با دستیار برقرار نشد.");
     } finally {
       setPending(false);
     }
+  }
+
+  async function send(overrideText?: string) {
+    const text = (overrideText ?? input).trim();
+    if (!text || pending) return;
+
+    const nextMessages = [...messages, { role: "user" as const, text }];
+    setMessages(nextMessages);
+    setInput("");
+    await sendMessages(nextMessages);
+  }
+
+  async function retryLast() {
+    if (!retryMessagesRef.current || pending) return;
+    await sendMessages(retryMessagesRef.current);
   }
 
   function toggleListening() {
@@ -168,7 +197,16 @@ export function ChatAssistant() {
               </div>
             </div>
           )}
-          {error && <p className="text-center text-sm text-destructive">{error}</p>}
+          {error && (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-center text-sm text-destructive">{error}</p>
+              {retryMessagesRef.current && (
+                <Button variant="outline" size="sm" onClick={() => retryLast()} disabled={pending}>
+                  تلاش دوباره
+                </Button>
+              )}
+            </div>
+          )}
           <div ref={endRef} />
         </div>
       </div>
