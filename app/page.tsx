@@ -65,7 +65,7 @@ export default async function LandingPage() {
 
       <main className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col items-center gap-24 overflow-hidden px-6 py-20 text-center">
         <div
-          className="pointer-events-none absolute -top-24 inset-s-1/2 -z-10 h-112 w-md -translate-x-1/2 rounded-full bg-primary/12 blur-3xl"
+          className="pointer-events-none absolute -top-24 inset-s-1/2 -z-10 h-112 w-md -translate-x-1/2 rounded-full bg-accent/60 blur-3xl"
           aria-hidden
         />
 

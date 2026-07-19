@@ -49,7 +49,7 @@
 }
 
 :root {
-  --background: oklch(0.97 0.009 85);
+  --background: oklch(0.97 0.02 85);
   --foreground: oklch(0.23 0.025 258);
   --card: oklch(0.995 0.005 85);
   --card-foreground: oklch(0.23 0.025 258);
@@ -124,7 +124,7 @@
   body {
     @apply bg-background text-foreground;
     background-image: radial-gradient(
-      color-mix(in oklch, var(--foreground) 7%, transparent) 1px,
+      oklch(0.62 0.1 55 / 35%) 1px,
       transparent 1px
     );
     background-size: 22px 22px;
