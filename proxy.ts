@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { decrypt } from "@/lib/session";
 
 const protectedRoutes = ["/dashboard", "/planner", "/goals", "/habits", "/journal", "/settings", "/admin"];
-const authRoutes = ["/login", "/register"];
+const authRoutes = ["/login", "/register", "/forgot-password"];
 
 export default async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
