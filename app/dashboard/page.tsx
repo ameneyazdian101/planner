@@ -19,8 +19,8 @@ export default async function DashboardPage() {
           <DailyProgressCard />
         </div>
 
-        <blockquote className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-accent/40 p-4 text-center text-sm text-accent-foreground italic">
-          <Quote className="size-4 shrink-0 opacity-70" />
+        <blockquote className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-border/60 border-e-4 border-e-primary bg-card p-4 text-center text-sm text-muted-foreground italic shadow-[0_1px_2px_color-mix(in_oklch,var(--foreground)_5%,transparent)]">
+          <Quote className="size-4 shrink-0 text-primary" />
           «{quote}»
         </blockquote>
 
