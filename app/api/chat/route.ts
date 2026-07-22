@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import * as z from "zod";
-import { GoogleGenAI, type Content, type FunctionDeclaration } from "@google/genai";
+import Groq from "groq-sdk";
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+} from "groq-sdk/resources/chat/completions";
 import { getApiUserId } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { badRequest, readJson } from "@/lib/api";
@@ -21,205 +25,233 @@ const ChatRequestSchema = z.object({
 
 const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-const listTasksDeclaration: FunctionDeclaration = {
-  name: "list_tasks",
-  description:
-    "لیست تسک‌های کاربر در یک بازه تاریخ رو برمی‌گردونه. قبل از پیشنهاد دادن یا ساختن تسک جدید، از این استفاده کن تا از برنامه فعلی کاربر مطلع بشی.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      from: { type: "string", description: "تاریخ شروع بازه، فرمت YYYY-MM-DD میلادی" },
-      to: { type: "string", description: "تاریخ پایان بازه، فرمت YYYY-MM-DD میلادی (برای یک روز، برابر from)" },
-    },
-    required: ["from", "to"],
-  },
+type ToolDef = {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
 };
 
-const createTaskDeclaration: FunctionDeclaration = {
-  name: "create_task",
-  description: "یک تسک جدید برای کاربر تو تقویمش می‌سازه.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      title: { type: "string", description: "عنوان تسک" },
-      date: { type: "string", description: "تاریخ تسک، فرمت YYYY-MM-DD میلادی" },
-      priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"], description: "اولویت، پیش‌فرض MEDIUM" },
-      startTime: { type: "string", description: "ساعت شروع اختیاری، فرمت HH:mm ۲۴ ساعته" },
-      endTime: { type: "string", description: "ساعت پایان اختیاری، فرمت HH:mm ۲۴ ساعته" },
-    },
-    required: ["title", "date"],
-  },
-};
-
-const updateTaskDeclaration: FunctionDeclaration = {
-  name: "update_task",
-  description:
-    "یک تسک موجود رو پیدا می‌کنه (بر اساس بخشی از عنوانش) و تغییرش می‌ده — مثلاً انجام‌شده علامت بزن، اولویتش رو عوض کن، یا به تاریخ دیگه‌ای منتقلش کن.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      titleSearch: { type: "string", description: "بخشی از عنوان تسکی که باید پیدا بشه" },
-      nearDate: {
-        type: "string",
-        description: "تاریخ تقریبی تسک برای کمک به پیدا کردنش، فرمت YYYY-MM-DD میلادی (اختیاری)",
+const toolDefs: ToolDef[] = [
+  {
+    name: "list_tasks",
+    description:
+      "لیست تسک‌های کاربر در یک بازه تاریخ رو برمی‌گردونه. قبل از پیشنهاد دادن یا ساختن تسک جدید، از این استفاده کن تا از برنامه فعلی کاربر مطلع بشی.",
+    parameters: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "تاریخ شروع بازه، فرمت YYYY-MM-DD میلادی" },
+        to: { type: "string", description: "تاریخ پایان بازه، فرمت YYYY-MM-DD میلادی (برای یک روز، برابر from)" },
       },
-      completed: { type: "boolean", description: "علامت زدن به عنوان انجام‌شده/نشده" },
-      newDate: { type: "string", description: "تاریخ جدید برای جابه‌جایی تسک، فرمت YYYY-MM-DD میلادی" },
-      priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"], description: "اولویت جدید" },
+      required: ["from", "to"],
     },
-    required: ["titleSearch"],
   },
-};
-
-const deleteTaskDeclaration: FunctionDeclaration = {
-  name: "delete_task",
-  description: "یک تسک موجود رو کاملاً حذف می‌کنه (نه انجام‌شده علامت زدن — واقعاً از لیست پاکش می‌کنه).",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      titleSearch: { type: "string", description: "بخشی از عنوان تسکی که باید حذف بشه" },
-      nearDate: {
-        type: "string",
-        description: "تاریخ تقریبی تسک برای کمک به پیدا کردنش، فرمت YYYY-MM-DD میلادی (اختیاری)",
+  {
+    name: "create_task",
+    description: "یک تسک جدید برای کاربر تو تقویمش می‌سازه.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "عنوان تسک" },
+        date: { type: "string", description: "تاریخ تسک، فرمت YYYY-MM-DD میلادی" },
+        priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"], description: "اولویت، پیش‌فرض MEDIUM" },
+        startTime: { type: "string", description: "ساعت شروع اختیاری، فرمت HH:mm ۲۴ ساعته" },
+        endTime: { type: "string", description: "ساعت پایان اختیاری، فرمت HH:mm ۲۴ ساعته" },
       },
+      required: ["title", "date"],
     },
-    required: ["titleSearch"],
   },
-};
-
-const listHabitsDeclaration: FunctionDeclaration = {
-  name: "list_habits",
-  description: "لیست عادت‌های کاربر رو برمی‌گردونه.",
-  parametersJsonSchema: { type: "object", properties: {} },
-};
-
-const createHabitDeclaration: FunctionDeclaration = {
-  name: "create_habit",
-  description: "یک عادت جدید (که قراره هر روز دنبال بشه) برای کاربر می‌سازه.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      name: { type: "string", description: "اسم عادت" },
+  {
+    name: "update_task",
+    description:
+      "یک تسک موجود رو پیدا می‌کنه (بر اساس بخشی از عنوانش) و تغییرش می‌ده — مثلاً انجام‌شده علامت بزن، اولویتش رو عوض کن، یا به تاریخ دیگه‌ای منتقلش کن.",
+    parameters: {
+      type: "object",
+      properties: {
+        titleSearch: { type: "string", description: "بخشی از عنوان تسکی که باید پیدا بشه" },
+        nearDate: {
+          type: "string",
+          description: "تاریخ تقریبی تسک برای کمک به پیدا کردنش، فرمت YYYY-MM-DD میلادی (اختیاری)",
+        },
+        completed: { type: "boolean", description: "علامت زدن به عنوان انجام‌شده/نشده" },
+        newDate: { type: "string", description: "تاریخ جدید برای جابه‌جایی تسک، فرمت YYYY-MM-DD میلادی" },
+        priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"], description: "اولویت جدید" },
+      },
+      required: ["titleSearch"],
     },
-    required: ["name"],
   },
-};
-
-const logHabitDeclaration: FunctionDeclaration = {
-  name: "log_habit",
-  description: "یک عادت رو برای یه روز مشخص، انجام‌شده یا انجام‌نشده علامت می‌زنه.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      nameSearch: { type: "string", description: "بخشی از اسم عادت" },
-      date: { type: "string", description: "تاریخ، فرمت YYYY-MM-DD میلادی" },
-      completed: { type: "boolean", description: "انجام شده (true) یا نشده (false)" },
+  {
+    name: "delete_task",
+    description: "یک تسک موجود رو کاملاً حذف می‌کنه (نه انجام‌شده علامت زدن — واقعاً از لیست پاکش می‌کنه).",
+    parameters: {
+      type: "object",
+      properties: {
+        titleSearch: { type: "string", description: "بخشی از عنوان تسکی که باید حذف بشه" },
+        nearDate: {
+          type: "string",
+          description: "تاریخ تقریبی تسک برای کمک به پیدا کردنش، فرمت YYYY-MM-DD میلادی (اختیاری)",
+        },
+      },
+      required: ["titleSearch"],
     },
-    required: ["nameSearch", "date", "completed"],
   },
-};
-
-const updateHabitDeclaration: FunctionDeclaration = {
-  name: "update_habit",
-  description: "اسم یا رنگ یک عادت موجود رو تغییر می‌ده.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      nameSearch: { type: "string", description: "بخشی از اسم فعلی عادت" },
-      newName: { type: "string", description: "اسم جدید (اختیاری)" },
-      newColor: { type: "string", description: "کد رنگ هگز جدید مثل #2563eb (اختیاری)" },
+  {
+    name: "list_habits",
+    description: "لیست عادت‌های کاربر رو برمی‌گردونه.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "create_habit",
+    description: "یک عادت جدید (که قراره هر روز دنبال بشه) برای کاربر می‌سازه.",
+    parameters: {
+      type: "object",
+      properties: { name: { type: "string", description: "اسم عادت" } },
+      required: ["name"],
     },
-    required: ["nameSearch"],
   },
-};
-
-const deleteHabitDeclaration: FunctionDeclaration = {
-  name: "delete_habit",
-  description: "یک عادت رو کاملاً حذف می‌کنه (همراه با تاریخچه انجامش).",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      nameSearch: { type: "string", description: "بخشی از اسم عادتی که باید حذف بشه" },
+  {
+    name: "log_habit",
+    description: "یک عادت رو برای یه روز مشخص، انجام‌شده یا انجام‌نشده علامت می‌زنه.",
+    parameters: {
+      type: "object",
+      properties: {
+        nameSearch: { type: "string", description: "بخشی از اسم عادت" },
+        date: { type: "string", description: "تاریخ، فرمت YYYY-MM-DD میلادی" },
+        completed: { type: "boolean", description: "انجام شده (true) یا نشده (false)" },
+      },
+      required: ["nameSearch", "date", "completed"],
     },
-    required: ["nameSearch"],
   },
-};
-
-const listGoalsDeclaration: FunctionDeclaration = {
-  name: "list_goals",
-  description: "لیست اهداف کوتاه‌مدت و بلندمدت کاربر رو برمی‌گردونه.",
-  parametersJsonSchema: { type: "object", properties: {} },
-};
-
-const createGoalDeclaration: FunctionDeclaration = {
-  name: "create_goal",
-  description: "یک هدف جدید برای کاربر می‌سازه.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      title: { type: "string", description: "عنوان هدف" },
-      type: { type: "string", enum: ["SHORT_TERM", "LONG_TERM"], description: "نوع هدف، پیش‌فرض کوتاه‌مدت" },
-      targetDate: { type: "string", description: "تاریخ هدف‌گذاری‌شده، فرمت YYYY-MM-DD میلادی (اختیاری)" },
+  {
+    name: "update_habit",
+    description: "اسم یا رنگ یک عادت موجود رو تغییر می‌ده.",
+    parameters: {
+      type: "object",
+      properties: {
+        nameSearch: { type: "string", description: "بخشی از اسم فعلی عادت" },
+        newName: { type: "string", description: "اسم جدید (اختیاری)" },
+        newColor: { type: "string", description: "کد رنگ هگز جدید مثل #2563eb (اختیاری)" },
+      },
+      required: ["nameSearch"],
     },
-    required: ["title"],
   },
-};
-
-const updateGoalProgressDeclaration: FunctionDeclaration = {
-  name: "update_goal_progress",
-  description: "درصد پیشرفت یک هدف موجود رو تغییر می‌ده.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      titleSearch: { type: "string", description: "بخشی از عنوان هدف" },
-      progress: { type: "number", description: "درصد پیشرفت جدید، عددی بین ۰ تا ۱۰۰" },
+  {
+    name: "delete_habit",
+    description: "یک عادت رو کاملاً حذف می‌کنه (همراه با تاریخچه انجامش).",
+    parameters: {
+      type: "object",
+      properties: { nameSearch: { type: "string", description: "بخشی از اسم عادتی که باید حذف بشه" } },
+      required: ["nameSearch"],
     },
-    required: ["titleSearch", "progress"],
   },
-};
-
-const deleteGoalDeclaration: FunctionDeclaration = {
-  name: "delete_goal",
-  description: "یک هدف رو کاملاً حذف می‌کنه.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      titleSearch: { type: "string", description: "بخشی از عنوان هدفی که باید حذف بشه" },
+  {
+    name: "list_goals",
+    description: "لیست اهداف کوتاه‌مدت و بلندمدت کاربر رو برمی‌گردونه.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "create_goal",
+    description: "یک هدف جدید برای کاربر می‌سازه.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "عنوان هدف" },
+        type: { type: "string", enum: ["SHORT_TERM", "LONG_TERM"], description: "نوع هدف، پیش‌فرض کوتاه‌مدت" },
+        targetDate: { type: "string", description: "تاریخ هدف‌گذاری‌شده، فرمت YYYY-MM-DD میلادی (اختیاری)" },
+      },
+      required: ["title"],
     },
-    required: ["titleSearch"],
   },
-};
-
-const writeJournalEntryDeclaration: FunctionDeclaration = {
-  name: "write_journal_entry",
-  description: "یادداشت روزانه کاربر رو برای یه تاریخ مشخص می‌نویسه یا بازنویسی می‌کنه.",
-  parametersJsonSchema: {
-    type: "object",
-    properties: {
-      date: { type: "string", description: "تاریخ یادداشت، فرمت YYYY-MM-DD میلادی" },
-      content: { type: "string", description: "متن یادداشت" },
+  {
+    name: "update_goal_progress",
+    description: "درصد پیشرفت یک هدف موجود رو تغییر می‌ده.",
+    parameters: {
+      type: "object",
+      properties: {
+        titleSearch: { type: "string", description: "بخشی از عنوان هدف" },
+        progress: { type: "number", description: "درصد پیشرفت جدید، عددی بین ۰ تا ۱۰۰" },
+      },
+      required: ["titleSearch", "progress"],
     },
-    required: ["date", "content"],
   },
-};
+  {
+    name: "delete_goal",
+    description: "یک هدف رو کاملاً حذف می‌کنه.",
+    parameters: {
+      type: "object",
+      properties: { titleSearch: { type: "string", description: "بخشی از عنوان هدفی که باید حذف بشه" } },
+      required: ["titleSearch"],
+    },
+  },
+  {
+    name: "write_journal_entry",
+    description: "یادداشت روزانه کاربر رو برای یه تاریخ مشخص می‌نویسه یا بازنویسی می‌کنه.",
+    parameters: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "تاریخ یادداشت، فرمت YYYY-MM-DD میلادی" },
+        content: { type: "string", description: "متن یادداشت" },
+      },
+      required: ["date", "content"],
+    },
+  },
+  {
+    name: "web_search",
+    description:
+      "برای سؤالاتی که نیاز به اطلاعات به‌روز یا اینترنتی دارن (اخبار، قیمت، اطلاعات عمومی جدید) وب رو جستجو می‌کنه.",
+    parameters: {
+      type: "object",
+      properties: { query: { type: "string", description: "عبارت جستجو" } },
+      required: ["query"],
+    },
+  },
+];
 
-/** Transient/service-busy — worth retrying the same key with backoff. */
-function isRetryableGeminiError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /"code":\s*503/.test(message);
-}
+const groqTools: ChatCompletionTool[] = toolDefs.map((t) => ({
+  type: "function",
+  function: { name: t.name, description: t.description, parameters: t.parameters },
+}));
 
-/** This specific key's quota is exhausted — retrying it won't help, switch keys instead. */
-function isQuotaExhaustedError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /"code":\s*429/.test(message);
+/** Transient/service-busy or rate-limited — worth retrying with backoff. */
+function isRetryableGroqError(error: unknown): boolean {
+  const status = (error as { status?: number } | undefined)?.status;
+  return status === 429 || status === 503 || status === 500;
 }
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function webSearch(query: string) {
+  const apiKey = process.env.TAVILY_API_KEY;
+  if (!apiKey) return { error: "جستجوی وب فعلاً تنظیم نشده." };
+  if (!query.trim()) return { error: "عبارت جستجو خالی است." };
+
+  try {
+    const res = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: apiKey, query, max_results: 5 }),
+    });
+    if (!res.ok) return { error: "جستجوی وب با خطا مواجه شد." };
+    const data = await res.json();
+    return {
+      answer: data.answer ?? null,
+      results: (data.results ?? []).map((r: { title?: string; url?: string; content?: string }) => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.content,
+      })),
+    };
+  } catch {
+    return { error: "جستجوی وب با خطا مواجه شد." };
+  }
+}
+
 async function executeTool(userId: string, name: string, args: Record<string, unknown>) {
+  if (name === "web_search") {
+    return webSearch(String(args.query ?? ""));
+  }
+
   if (name === "list_tasks") {
     const from = String(args.from ?? "");
     const to = String(args.to ?? "");
@@ -454,13 +486,9 @@ export async function POST(request: NextRequest) {
   const userId = await getApiUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const apiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_2].filter(
-    (k): k is string => !!k
-  );
-
-  if (apiKeys.length === 0) {
+  if (!process.env.GROQ_API_KEY) {
     return NextResponse.json(
-      { error: "دستیار هوش مصنوعی هنوز تنظیم نشده. کلید GEMINI_API_KEY رو تو تنظیمات اضافه کن." },
+      { error: "دستیار هوش مصنوعی هنوز تنظیم نشده. کلید GROQ_API_KEY رو تو تنظیمات اضافه کن." },
       { status: 503 }
     );
   }
@@ -471,16 +499,10 @@ export async function POST(request: NextRequest) {
   const parsed = ChatRequestSchema.safeParse(body);
   if (!parsed.success) return badRequest("پیام‌ها نامعتبر است.");
 
-  let keyIndex = 0;
-  let ai = new GoogleGenAI({ apiKey: apiKeys[keyIndex] });
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   const today = todayKey();
   const now = new Date();
   const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-  const contents: Content[] = parsed.data.messages.map((m) => ({
-    role: m.role,
-    parts: [{ text: m.text }],
-  }));
 
   const [profileUser, profileGoals, profileHabits, profileTodayTasks] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
@@ -521,12 +543,12 @@ export async function POST(request: NextRequest) {
     `این خلاصه‌ای از شناختت نسبت به این کاربر خاصه، همیشه در نظرش داشته باش و جواب‌هات رو بر همین اساس شخصی‌سازی کن: ${profileBlock}`,
     "این شناخت از کاربر رو فعالانه به کار ببر: مثلاً وقتی داره برنامه‌ریزی می‌کنه، اگه به یکی از اهداف یا عادت‌هاش مرتبطه اشاره کن؛ یا اگه ازش در مورد پیشرفت یکی از اهدافش بی‌خبر بودی، طبیعی وسط گفتگو ازش بپرس. زیاده‌روی نکن، فقط طوری رفتار کن که انگار واقعاً کاربر رو می‌شناسی.",
     "چون اهداف، عادت‌ها و تسک‌های امروز کاربر همین بالا در اختیارته، برای این‌ها دیگه نیازی به صدا زدن list_goals/list_habits نداری و برای تسک‌های امروز هم نیازی به list_tasks نداری — فقط وقتی به تسک‌های یه روز دیگه (نه امروز) نیاز داری از list_tasks استفاده کن. این باعث می‌شه سریع‌تر و با تعداد درخواست کمتر جواب بدی.",
-    "اگه واقعاً به چند ابزار برای جمع‌آوری اطلاعات نیاز داری (مثلاً list_tasks یه روز دیگه)، تا حد امکان اون‌ها رو با هم و تو یه نوبت صدا بزن، نه پشت‌سرهم در نوبت‌های جدا — این تعداد رفت‌وبرگشت با سرویس هوش مصنوعی رو کم می‌کنه.",
+    "اگه واقعاً به چند ابزار برای جمع‌آوری اطلاعات نیاز داری (مثلاً list_tasks یه روز دیگه)، تا حد امکان اون‌ها رو با هم و تو یه نوبت صدا بزن، نه پشت‌سرهم در نوبت‌های جدا — این تعداد رفت‌وبرگشت رو کم می‌کنه.",
     `تاریخ‌های نسبی مثل «فردا» یا «پس‌فردا» رو بر اساس تاریخ میلادی امروز (${today}) محاسبه کن و همون فرمت YYYY-MM-DD میلادی رو به ابزارها بده — چون تقویم برنامه‌ریز داخلاً میلادیه.`,
     `عبارت‌های نسبی زمانی مثل «۵ دقیقه دیگه»، «ده دقیقه دیگه»، «یک ربع دیگه» (= ۱۵ دقیقه)، «نیم ساعت دیگه» (= ۳۰ دقیقه)، «یک ساعت دیگه» رو دقیقاً با جمع‌زدن روی ساعت الان (${nowTime}) محاسبه کن و فرمت HH:mm بده — هیچ‌وقت این محاسبه رو تقریبی یا حدسی انجام نده.`,
     "هرگز خودت تاریخ شمسی رو با محاسبه دستی به کاربر نگو، چون احتمال اشتباه داری. تو جواب‌هات برای اشاره به تاریخ فقط از عبارت‌های نسبی مثل «فردا»، «پس‌فردا» یا اسم روز هفته (که تو ابزار list_tasks برات مشخصه) استفاده کن، نه یه عدد شمسی ساخته‌شده توسط خودت.",
     "علاوه بر تسک‌های روزانه (که با create_task/update_task/delete_task/list_tasks مدیریت می‌شن)، به این بخش‌های اپ هم دسترسی کامل داری: عادت‌ها (list_habits, create_habit, update_habit, delete_habit, log_habit)، اهداف (list_goals, create_goal, update_goal_progress, delete_goal)، و یادداشت روزانه (write_journal_entry).",
-    "اگه کاربر سؤالی عمومی پرسید که به اطلاعات روز یا اینترنت نیاز داره (اخبار، قیمت، اطلاعات عمومی)، از قابلیت جستجوی وب استفاده کن تا جواب به‌روز و درست بدی، نه از حافظه‌ات.",
+    "اگه کاربر سؤالی عمومی پرسید که به اطلاعات روز یا اینترنت نیاز داره (اخبار، قیمت، اطلاعات عمومی)، از ابزار web_search استفاده کن تا جواب به‌روز و درست بدی، نه از حافظه‌ات.",
     "تو فقط محدود به کارهای برنامه‌ریز نیستی — هر سؤال عمومی دیگه‌ای هم (غیر از پلنر) پرسیده بشه، عادی و کامل جوابش رو بده، مثل یه دستیار هوشمند همه‌کاره.",
     "هیچ‌وقت رمز عبور، ایمیل حساب، یا هر تنظیمات امنیتی حساب کاربری رو تغییر نده یا پیشنهاد نده — این کارها فقط باید مستقیم توسط خود کاربر از تنظیمات انجام بشه.",
     "نمای هفتگی و ماهانه برنامه‌ریز، فقط یه شکل دیگه از همون تسک‌هاست — برای ساختن تسک تو هر روزی از هفته یا ماه، فقط کافیه create_task رو با همون تاریخ صدا بزنی، ابزار جدایی لازم نیست.",
@@ -537,78 +559,62 @@ export async function POST(request: NextRequest) {
     "اگه ابزاری برای پیدا کردن یه تسک/عادت/هدف با اسمش نتیجه‌ای برنگردوند (پیدا نشد)، اینو صادقانه به کاربر بگو و ازش بخواه اسم دقیق‌تری بگه، خودت چیزی نساز که درخواست نشده.",
   ].join(" ");
 
+  const messages: ChatCompletionMessageParam[] = [
+    { role: "system", content: systemInstruction },
+    ...parsed.data.messages.map(
+      (m): ChatCompletionMessageParam => ({
+        role: m.role === "model" ? "assistant" : "user",
+        content: m.text,
+      })
+    ),
+  ];
+
   let finalText = "";
   const MAX_TOOL_ROUNDS = 5;
   const MAX_RETRIES = 3;
 
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      let response;
+      let completion;
       for (let attempt = 0; ; attempt++) {
         try {
-          response = await ai.models.generateContent({
-            model: "gemini-flash-lite-latest",
-            contents,
-            config: {
-              systemInstruction,
-              tools: [
-                {
-                  functionDeclarations: [
-                    listTasksDeclaration,
-                    createTaskDeclaration,
-                    updateTaskDeclaration,
-                    deleteTaskDeclaration,
-                    listHabitsDeclaration,
-                    createHabitDeclaration,
-                    updateHabitDeclaration,
-                    deleteHabitDeclaration,
-                    logHabitDeclaration,
-                    listGoalsDeclaration,
-                    createGoalDeclaration,
-                    updateGoalProgressDeclaration,
-                    deleteGoalDeclaration,
-                    writeJournalEntryDeclaration,
-                  ],
-                },
-                { googleSearch: {} },
-              ],
-            },
+          completion = await groq.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages,
+            tools: groqTools,
+            tool_choice: "auto",
           });
           break;
         } catch (err) {
-          if (isQuotaExhaustedError(err) && keyIndex < apiKeys.length - 1) {
-            keyIndex++;
-            ai = new GoogleGenAI({ apiKey: apiKeys[keyIndex] });
-            console.error(`[chat] Key ${keyIndex} quota exhausted, switching to backup key.`);
-            continue;
-          }
-          if (attempt >= MAX_RETRIES - 1 || !isRetryableGeminiError(err)) throw err;
+          if (attempt >= MAX_RETRIES - 1 || !isRetryableGroqError(err)) throw err;
           await sleep(500 * 2 ** attempt);
         }
       }
 
-      const modelParts = response.candidates?.[0]?.content?.parts ?? [];
-      const callParts = modelParts.filter((p) => p.functionCall);
-      if (callParts.length === 0) {
-        finalText = response.text ?? "";
+      const message = completion.choices[0]?.message;
+      const toolCalls = message?.tool_calls ?? [];
+
+      if (!message || toolCalls.length === 0) {
+        finalText = message?.content ?? "";
         break;
       }
 
-      // Push the exact parts Gemini returned (not a reconstructed copy) — Gemini 3.x
-      // attaches a `thoughtSignature` alongside each functionCall part that must be
-      // replayed back verbatim, or the next call fails with a 400.
-      contents.push({ role: "model", parts: modelParts });
+      messages.push({ role: "assistant", content: message.content, tool_calls: toolCalls });
 
-      const responseParts = [];
-      for (const part of callParts) {
-        const call = part.functionCall!;
-        const result = await executeTool(userId, call.name ?? "", call.args ?? {});
-        responseParts.push({ functionResponse: { name: call.name, response: result } });
+      for (const toolCall of toolCalls) {
+        if (toolCall.type !== "function") continue;
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(toolCall.function.arguments || "{}");
+        } catch {
+          // malformed args from the model — treat as empty, tool validation will reject as needed
+        }
+        const result = await executeTool(userId, toolCall.function.name, args);
+        messages.push({ role: "tool", tool_call_id: toolCall.id, content: JSON.stringify(result) });
       }
-      contents.push({ role: "user", parts: responseParts });
     }
   } catch (err) {
-    console.error("[chat] Gemini error:", err instanceof Error ? err.message : err);
+    console.error("[chat] Groq error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
       { error: "سرویس هوش مصنوعی الان شلوغه یا در دسترس نیست. چند لحظه دیگه دوباره امتحان کن." },
       { status: 503 }
