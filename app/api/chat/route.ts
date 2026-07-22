@@ -203,9 +203,16 @@ const writeJournalEntryDeclaration: FunctionDeclaration = {
   },
 };
 
+/** Transient/service-busy — worth retrying the same key with backoff. */
 function isRetryableGeminiError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /"code":\s*(503|429)/.test(message);
+  return /"code":\s*503/.test(message);
+}
+
+/** This specific key's quota is exhausted — retrying it won't help, switch keys instead. */
+function isQuotaExhaustedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /"code":\s*429/.test(message);
 }
 
 async function sleep(ms: number) {
@@ -447,7 +454,11 @@ export async function POST(request: NextRequest) {
   const userId = await getApiUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_2].filter(
+    (k): k is string => !!k
+  );
+
+  if (apiKeys.length === 0) {
     return NextResponse.json(
       { error: "دستیار هوش مصنوعی هنوز تنظیم نشده. کلید GEMINI_API_KEY رو تو تنظیمات اضافه کن." },
       { status: 503 }
@@ -460,7 +471,8 @@ export async function POST(request: NextRequest) {
   const parsed = ChatRequestSchema.safeParse(body);
   if (!parsed.success) return badRequest("پیام‌ها نامعتبر است.");
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  let keyIndex = 0;
+  let ai = new GoogleGenAI({ apiKey: apiKeys[keyIndex] });
   const today = todayKey();
   const now = new Date();
   const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -564,6 +576,12 @@ export async function POST(request: NextRequest) {
           });
           break;
         } catch (err) {
+          if (isQuotaExhaustedError(err) && keyIndex < apiKeys.length - 1) {
+            keyIndex++;
+            ai = new GoogleGenAI({ apiKey: apiKeys[keyIndex] });
+            console.error(`[chat] Key ${keyIndex} quota exhausted, switching to backup key.`);
+            continue;
+          }
           if (attempt >= MAX_RETRIES - 1 || !isRetryableGeminiError(err)) throw err;
           await sleep(500 * 2 ** attempt);
         }
