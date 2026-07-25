@@ -13,9 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TimePicker } from "@/components/ui/time-picker";
 import { todayKey } from "@/lib/date";
 import { toPersianDigits } from "@/lib/jalali";
 import { cn } from "@/lib/utils";
+
+/** Current time rounded down to the nearest 5 minutes, to match the time picker's steps. */
+function roundedNowTime(): string {
+  const now = new Date();
+  const minute = Math.floor(now.getMinutes() / 5) * 5;
+  return `${String(now.getHours()).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
 
 type Priority = "LOW" | "MEDIUM" | "HIGH";
 
@@ -69,7 +77,7 @@ export function TaskList({
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("MEDIUM");
-  const [startTime, setStartTime] = useState("");
+  const [startTime, setStartTime] = useState(roundedNowTime);
   const [endTime, setEndTime] = useState("");
 
   const { data: tasks, isLoading } = useQuery({
@@ -107,7 +115,7 @@ export function TaskList({
     },
     onSuccess: () => {
       setTitle("");
-      setStartTime("");
+      setStartTime(roundedNowTime());
       setEndTime("");
       invalidate();
     },
@@ -203,21 +211,9 @@ export function TaskList({
           />
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">
-              <Input
-                type="time"
-                aria-label="ساعت شروع"
-                className="w-26"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
+              <TimePicker aria-label="ساعت شروع" value={startTime} onChange={setStartTime} />
               <span className="text-xs text-muted-foreground">تا</span>
-              <Input
-                type="time"
-                aria-label="ساعت پایان"
-                className="w-26"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
+              <TimePicker aria-label="ساعت پایان" value={endTime} onChange={setEndTime} />
             </div>
             {prioritySelect}
             <Button
