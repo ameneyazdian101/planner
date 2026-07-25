@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { Mail } from "lucide-react";
 import { login } from "@/app/actions/auth";
@@ -19,6 +19,13 @@ import {
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, undefined);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    setDismissed(false);
+  }, [state]);
+
+  const showErrors = !dismissed;
 
   return (
     <AuthShell>
@@ -39,9 +46,10 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@example.com"
                   className="ps-9"
+                  onChange={() => setDismissed(true)}
                 />
               </div>
-              {state?.errors?.email && (
+              {showErrors && state?.errors?.email && (
                 <p className="text-sm text-destructive">{state.errors.email[0]}</p>
               )}
             </div>
@@ -52,12 +60,12 @@ export default function LoginPage() {
                   رمزت یادت رفته؟
                 </Link>
               </div>
-              <PasswordInput id="password" name="password" />
-              {state?.errors?.password && (
+              <PasswordInput id="password" name="password" onChange={() => setDismissed(true)} />
+              {showErrors && state?.errors?.password && (
                 <p className="text-sm text-destructive">{state.errors.password[0]}</p>
               )}
             </div>
-            {state?.message && (
+            {showErrors && state?.message && (
               <p className="text-sm text-destructive">{state.message}</p>
             )}
             <Button type="submit" disabled={pending} className="w-full">

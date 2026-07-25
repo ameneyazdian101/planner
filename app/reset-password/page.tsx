@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useActionState } from "react";
+import { Suspense, useActionState, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { resetPassword } from "@/app/actions/auth";
@@ -19,6 +19,11 @@ import {
 function ResetPasswordForm() {
   const token = useSearchParams().get("token") ?? "";
   const [state, action, pending] = useActionState(resetPassword.bind(null, token), undefined);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    setDismissed(false);
+  }, [state]);
 
   if (!token) {
     return (
@@ -35,12 +40,12 @@ function ResetPasswordForm() {
     <form action={action} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">رمز عبور جدید</Label>
-        <PasswordInput id="password" name="password" />
-        {state?.errors?.password && (
+        <PasswordInput id="password" name="password" onChange={() => setDismissed(true)} />
+        {!dismissed && state?.errors?.password && (
           <p className="text-sm text-destructive">{state.errors.password[0]}</p>
         )}
       </div>
-      {state?.message && <p className="text-sm text-destructive">{state.message}</p>}
+      {!dismissed && state?.message && <p className="text-sm text-destructive">{state.message}</p>}
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "در حال ثبت..." : "ثبت رمز جدید"}
       </Button>

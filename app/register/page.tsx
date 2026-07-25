@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { Mail, User } from "lucide-react";
 import { signup } from "@/app/actions/auth";
@@ -19,6 +19,13 @@ import {
 
 export default function RegisterPage() {
   const [state, action, pending] = useActionState(signup, undefined);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    setDismissed(false);
+  }, [state]);
+
+  const showErrors = !dismissed;
 
   return (
     <AuthShell>
@@ -33,9 +40,15 @@ export default function RegisterPage() {
               <Label htmlFor="name">نام</Label>
               <div className="relative">
                 <User className="pointer-events-none absolute inset-y-0 inset-s-3 my-auto size-4 text-muted-foreground" />
-                <Input id="name" name="name" placeholder="نام شما" className="ps-9" />
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="نام شما"
+                  className="ps-9"
+                  onChange={() => setDismissed(true)}
+                />
               </div>
-              {state?.errors?.name && (
+              {showErrors && state?.errors?.name && (
                 <p className="text-sm text-destructive">{state.errors.name[0]}</p>
               )}
             </div>
@@ -49,16 +62,17 @@ export default function RegisterPage() {
                   type="email"
                   placeholder="you@example.com"
                   className="ps-9"
+                  onChange={() => setDismissed(true)}
                 />
               </div>
-              {state?.errors?.email && (
+              {showErrors && state?.errors?.email && (
                 <p className="text-sm text-destructive">{state.errors.email[0]}</p>
               )}
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="password">رمز عبور</Label>
-              <PasswordInput id="password" name="password" />
-              {state?.errors?.password && (
+              <PasswordInput id="password" name="password" onChange={() => setDismissed(true)} />
+              {showErrors && state?.errors?.password && (
                 <ul className="text-sm text-destructive">
                   {state.errors.password.map((error) => (
                     <li key={error}>{error}</li>
@@ -66,7 +80,7 @@ export default function RegisterPage() {
                 </ul>
               )}
             </div>
-            {state?.message && (
+            {showErrors && state?.message && (
               <p className="text-sm text-destructive">{state.message}</p>
             )}
             <Button type="submit" disabled={pending} className="w-full">

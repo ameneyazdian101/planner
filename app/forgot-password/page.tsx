@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { requestPasswordReset } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,11 @@ import {
 
 export default function ForgotPasswordPage() {
   const [state, action, pending] = useActionState(requestPasswordReset, undefined);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    setDismissed(false);
+  }, [state]);
 
   return (
     <AuthShell>
@@ -29,12 +34,18 @@ export default function ForgotPasswordPage() {
           <form action={action} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">ایمیل</Label>
-              <Input id="email" name="email" type="email" placeholder="you@example.com" />
-              {state?.errors?.email && (
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                onChange={() => setDismissed(true)}
+              />
+              {!dismissed && state?.errors?.email && (
                 <p className="text-sm text-destructive">{state.errors.email[0]}</p>
               )}
             </div>
-            {state?.message && (
+            {!dismissed && state?.message && (
               <p className="text-sm text-muted-foreground">{state.message}</p>
             )}
             <Button type="submit" disabled={pending} className="w-full">
