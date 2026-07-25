@@ -1,18 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans_Arabic, Vazirmatn } from "next/font/google";
+import { Vazirmatn } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
-
-const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
-  variable: "--font-ibm-plex-sans-arabic",
-  subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
 
 const vazirmatn = Vazirmatn({
   variable: "--font-vazirmatn",
   subsets: ["arabic", "latin"],
-  weight: ["600", "700", "800"],
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -34,7 +28,7 @@ export default function RootLayout({
       lang="fa"
       dir="rtl"
       suppressHydrationWarning
-      className={`${ibmPlexSansArabic.variable} ${vazirmatn.variable} h-full antialiased`}
+      className={`${vazirmatn.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
