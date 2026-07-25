@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, LogOut, NotebookPen, Repeat2, Sparkles, Target } from "lucide-react";
+import { CalendarDays, LogOut, type LucideIcon, Loader2, NotebookPen, Repeat2, Sparkles, Target } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -19,6 +19,16 @@ const NAV_ITEMS = [
   { href: "/journal", matchPrefix: "/journal", label: "یادداشت روزانه", icon: NotebookPen },
   { href: "/assistant", matchPrefix: "/assistant", label: "دستیار هوشمند", icon: Sparkles },
 ];
+
+function NavTabContent({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  const { pending } = useLinkStatus();
+  return (
+    <>
+      {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Icon className="size-3.5" />}
+      <span className="hidden lg:inline">{label}</span>
+    </>
+  );
+}
 
 function greetingForHour(hour: number): string {
   if (hour >= 5 && hour < 12) return "صبح بخیر";
@@ -56,7 +66,6 @@ export function AppHeader({ userName }: { userName?: string | null }) {
         <nav className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/70 p-1">
           {NAV_ITEMS.map((item) => {
             const active = pathname?.startsWith(item.matchPrefix);
-            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
@@ -68,8 +77,7 @@ export function AppHeader({ userName }: { userName?: string | null }) {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Icon className="size-3.5" />
-                <span className="hidden lg:inline">{item.label}</span>
+                <NavTabContent icon={item.icon} label={item.label} />
               </Link>
             );
           })}
