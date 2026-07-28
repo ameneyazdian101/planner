@@ -27,13 +27,18 @@ self.addEventListener("push", (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || "پلنر", {
-      body: payload.body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      tag: payload.tag || "planner-push",
-      data: { url: payload.url || "/dashboard" },
-    })
+    Promise.all([
+      self.registration.showNotification(payload.title || "پلنر", {
+        body: payload.body,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: payload.tag || "planner-push",
+        data: { url: payload.url || "/dashboard" },
+      }),
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientsList) => {
+        for (const client of clientsList) client.postMessage({ type: "reminder-fired" });
+      }),
+    ])
   );
 });
 

@@ -128,3 +128,27 @@
     @apply font-sans;
   }
 }
+
+@keyframes bell-ring {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(15deg);
+  }
+  40% {
+    transform: rotate(-12deg);
+  }
+  60% {
+    transform: rotate(9deg);
+  }
+  80% {
+    transform: rotate(-6deg);
+  }
+}
+
+.animate-bell-ring {
+  transform-origin: top center;
+  animation: bell-ring 0.5s ease-in-out 2;
+}

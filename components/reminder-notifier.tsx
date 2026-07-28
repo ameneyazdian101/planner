@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellRing } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -35,6 +36,7 @@ async function subscribeToPush(): Promise<boolean> {
 export function ReminderNotifier() {
   const [permission, setPermission] = useState<NotificationPermission | null>(null);
   const [subscribed, setSubscribed] = useState(false);
+  const [ringing, setRinging] = useState(false);
 
   useEffect(() => {
     if (typeof Notification === "undefined") return;
@@ -42,6 +44,17 @@ export function ReminderNotifier() {
     if (Notification.permission === "granted") {
       subscribeToPush().then(setSubscribed);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "reminder-fired") return;
+      setRinging(true);
+      setTimeout(() => setRinging(false), 1000);
+    };
+    navigator.serviceWorker.addEventListener("message", handleMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", handleMessage);
   }, []);
 
   const enable = async () => {
@@ -60,7 +73,7 @@ export function ReminderNotifier() {
         className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground"
         title="یادآوری تسک‌ها فعاله"
       >
-        <BellRing className="size-3.5" />
+        <BellRing className={cn("size-3.5", ringing && "animate-bell-ring text-primary")} />
       </span>
     );
   }
