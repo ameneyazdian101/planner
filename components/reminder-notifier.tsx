@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellRing } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -13,7 +14,12 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 async function subscribeToPush(): Promise<boolean> {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!publicKey || !("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+  if (!publicKey) throw new Error("کلید یادآوری روی سرور تنظیم نشده.");
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    throw new Error(
+      "این گوشی/مرورگر از نوتیف پشتیبانی نمی‌کنه. روی آیفون باید iOS 16.4 یا بالاتر باشه و برنامه از روی آیکون نصب‌شده روی صفحه‌خونه باز بشه."
+    );
+  }
 
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
@@ -30,7 +36,8 @@ async function subscribeToPush(): Promise<boolean> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
   });
-  return res.ok;
+  if (!res.ok) throw new Error("ثبت یادآوری روی سرور با خطا مواجه شد.");
+  return true;
 }
 
 export function ReminderNotifier() {
@@ -42,7 +49,9 @@ export function ReminderNotifier() {
     if (typeof Notification === "undefined") return;
     setPermission(Notification.permission);
     if (Notification.permission === "granted") {
-      subscribeToPush().then(setSubscribed);
+      subscribeToPush()
+        .then(setSubscribed)
+        .catch(() => setSubscribed(false));
     }
   }, []);
 
@@ -58,11 +67,26 @@ export function ReminderNotifier() {
   }, []);
 
   const enable = async () => {
-    if (typeof Notification === "undefined") return;
+    if (typeof Notification === "undefined") {
+      toast.error(
+        "این گوشی/مرورگر از نوتیف پشتیبانی نمی‌کنه. روی آیفون باید iOS 16.4 یا بالاتر باشه و برنامه از روی آیکون نصب‌شده روی صفحه‌خونه باز بشه."
+      );
+      return;
+    }
+
     const result = await Notification.requestPermission();
     setPermission(result);
-    if (result === "granted") {
+    if (result === "denied") {
+      toast.error("اجازه‌ی نوتیف داده نشد. از تنظیمات گوشی/مرورگر باید دوباره اجازه بدید.");
+      return;
+    }
+    if (result !== "granted") return;
+
+    try {
       setSubscribed(await subscribeToPush());
+      toast.success("یادآوری تسک‌ها فعال شد.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "فعال‌سازی یادآوری با خطا مواجه شد.");
     }
   };
 
