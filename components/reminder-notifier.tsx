@@ -93,12 +93,17 @@ export function ReminderNotifier() {
   if (permission === "denied") return null;
   if (permission === "granted" && subscribed) {
     return (
-      <span
-        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground"
+      <button
+        type="button"
+        onClick={() => toast.success("یادآوری تسک‌ها فعاله.")}
+        className="flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
         title="یادآوری تسک‌ها فعاله"
       >
-        <BellRing className={cn("size-3.5", ringing && "animate-bell-ring text-primary")} />
-      </span>
+        <BellRing
+          fill="currentColor"
+          className={cn("size-3.5", ringing && "animate-bell-ring")}
+        />
+      </button>
     );
   }
 
