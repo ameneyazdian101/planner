@@ -1,4 +1,4 @@
-const CACHE_NAME = "planner-shell-v1";
+const CACHE_NAME = "planner-shell-v2";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [OFFLINE_URL, "/manifest.webmanifest"];
 
@@ -70,7 +70,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Static assets (hashed, immutable): cache-first.
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icon")) {
+  // Note: /icon* routes are excluded — they're generated on demand and can
+  // change content at the same URL across deploys, unlike hashed _next/static files.
+  if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>
