@@ -11,5 +11,12 @@ jobs:
     steps:
       - name: Trigger reminder check
         run: |
-          curl -sf -X GET "https://planner-vmdv-eight.vercel.app/api/cron/reminders" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          response=$(curl -s -w "\n%{http_code}" -X GET "https://planner-vmdv-eight.vercel.app/api/cron/reminders" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          status="${response##*$'\n'}"
+          body="${response%$'\n'*}"
+          echo "HTTP status: $status"
+          echo "Response body: $body"
+          if [ "$status" -ne 200 ]; then
+            exit 1
+          fi
