@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { NotebookPen } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
@@ -13,12 +12,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         aria-hidden
       />
       <div className="relative flex w-full max-w-sm flex-col items-center gap-6">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-            <NotebookPen className="size-4.5" />
-          </span>
-          <span className="font-heading text-xl font-bold text-primary">پلنر</span>
-        </Link>
+        <Logo size="lg" href="/" />
         {children}
       </div>
     </div>

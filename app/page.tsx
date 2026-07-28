@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { CalendarCheck, NotebookPen, Target, Repeat, BookHeart, Sparkles } from "lucide-react";
+import { CalendarCheck, Target, Repeat, BookHeart, Sparkles } from "lucide-react";
 import { getApiUserId } from "@/lib/dal";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/logo";
 
 const FEATURES = [
   {
@@ -39,12 +40,7 @@ export default async function LandingPage() {
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-20 border-b border-border/70 bg-card/90 backdrop-blur-sm supports-backdrop-filter:bg-card/70">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between p-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <NotebookPen className="size-4" />
-            </span>
-            <span className="font-heading text-lg font-bold text-primary">پلنر</span>
-          </Link>
+          <Logo href="/" />
           <nav className="flex items-center gap-2">
             <ThemeToggle />
             {userId ? (

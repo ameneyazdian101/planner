@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ReminderNotifier } from "@/components/reminder-notifier";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/logo";
 import { todayKey } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
@@ -49,12 +50,7 @@ export function AppHeader({ userName }: { userName?: string | null }) {
     <header className="sticky top-0 z-20 border-b border-border/70 bg-card/90 backdrop-blur-sm supports-backdrop-filter:bg-card/70">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <NotebookPen className="size-4" />
-            </span>
-            <span className="font-heading text-lg font-bold text-primary">پلنر</span>
-          </Link>
+          <Logo href="/dashboard" />
           <div className="hidden items-center gap-2 border-r border-border pr-3 sm:flex">
             <Avatar size="sm">
               <AvatarFallback>{(userName ?? "؟").charAt(0)}</AvatarFallback>
