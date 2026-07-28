@@ -25,8 +25,14 @@ function nowInIran(): { dateKey: string; hhmm: string } {
 }
 
 export async function GET(request: NextRequest) {
-  const secret = request.nextUrl.searchParams.get("secret");
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+  // Vercel Cron sends the secret as `Authorization: Bearer <CRON_SECRET>`.
+  // The query param is kept only as a fallback for manual testing.
+  const authHeader = request.headers.get("authorization");
+  const querySecret = request.nextUrl.searchParams.get("secret");
+  const authorized =
+    !!process.env.CRON_SECRET &&
+    (authHeader === `Bearer ${process.env.CRON_SECRET}` || querySecret === process.env.CRON_SECRET);
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
