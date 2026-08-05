@@ -1,4 +1,12 @@
-const CACHE_NAME = "planner-shell-v2";
+// Served from the app router (instead of public/sw.js) so the script's
+// content changes on every deploy — the browser only re-installs a service
+// worker when its bytes differ, and app code changes alone don't touch a
+// static sw.js file.
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
+
+function serviceWorkerScript(buildId: string) {
+  return `// build: ${buildId}
+const CACHE_NAME = "planner-shell-${buildId}";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [OFFLINE_URL, "/manifest.webmanifest"];
 
@@ -91,3 +99,14 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+`;
+}
+
+export function GET() {
+  return new Response(serviceWorkerScript(BUILD_ID), {
+    headers: {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
