@@ -20,7 +20,8 @@ import { dateKeyFromUtcDate } from "@/lib/date";
 
 type AdminUser = {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   name: string | null;
   isAdmin: boolean;
   createdAt: string;
@@ -107,7 +108,7 @@ export function AdminUserTable({ currentAdminId }: { currentAdminId: string }) {
           <thead className="bg-muted/50 text-right text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">نام</th>
-              <th className="px-3 py-2 font-medium">ایمیل</th>
+              <th className="px-3 py-2 font-medium">ایمیل / تلفن</th>
               <th className="px-3 py-2 font-medium">نقش</th>
               <th className="px-3 py-2 font-medium">تاریخ ثبت‌نام</th>
               <th className="px-3 py-2 font-medium">تسک/هدف/عادت/یادداشت</th>
@@ -118,7 +119,7 @@ export function AdminUserTable({ currentAdminId }: { currentAdminId: string }) {
             {users?.map((user) => (
               <tr key={user.id} className="border-t">
                 <td className="px-3 py-2">{user.name ?? "—"}</td>
-                <td className="px-3 py-2">{user.email}</td>
+                <td className="px-3 py-2">{user.email ?? user.phone ?? "—"}</td>
                 <td className="px-3 py-2">
                   {user.isAdmin ? (
                     <Badge>ادمین</Badge>
@@ -164,7 +165,7 @@ export function AdminUserTable({ currentAdminId }: { currentAdminId: string }) {
                       aria-label="حذف کاربر"
                       disabled={deleteUser.isPending || user.id === currentAdminId}
                       onClick={() => {
-                        if (confirm(`کاربر «${user.name ?? user.email}» حذف شود؟ این عمل همه داده‌های او را نیز پاک می‌کند.`)) {
+                        if (confirm(`کاربر «${user.name ?? user.email ?? user.phone}» حذف شود؟ این عمل همه داده‌های او را نیز پاک می‌کند.`)) {
                           deleteUser.mutate(user.id);
                         }
                       }}
@@ -188,7 +189,7 @@ export function AdminUserTable({ currentAdminId }: { currentAdminId: string }) {
           <DialogHeader>
             <DialogTitle>تغییر رمز عبور</DialogTitle>
             <DialogDescription>
-              رمز عبور جدید برای «{resetTarget?.name ?? resetTarget?.email}» را وارد کنید.
+              رمز عبور جدید برای «{resetTarget?.name ?? resetTarget?.email ?? resetTarget?.phone}» را وارد کنید.
             </DialogDescription>
           </DialogHeader>
           <Input

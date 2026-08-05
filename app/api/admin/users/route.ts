@@ -10,6 +10,7 @@ export async function GET() {
     select: {
       id: true,
       email: true,
+      phone: true,
       name: true,
       isAdmin: true,
       createdAt: true,

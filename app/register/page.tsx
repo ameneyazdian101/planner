@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
-import { Mail, User } from "lucide-react";
+import { IdCard, User } from "lucide-react";
 import { signup } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,20 +53,21 @@ export default function RegisterPage() {
               )}
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email">ایمیل</Label>
+              <Label htmlFor="identifier">ایمیل یا شماره تلفن</Label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute inset-y-0 inset-s-3 my-auto size-4 text-muted-foreground" />
+                <IdCard className="pointer-events-none absolute inset-y-0 inset-s-3 my-auto size-4 text-muted-foreground" />
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="you@example.com"
+                  id="identifier"
+                  name="identifier"
+                  type="text"
+                  inputMode="email"
+                  placeholder="you@example.com یا 09xxxxxxxxx"
                   className="ps-9"
                   onChange={() => setDismissed(true)}
                 />
               </div>
-              {showErrors && state?.errors?.email && (
-                <p className="text-sm text-destructive">{state.errors.email[0]}</p>
+              {showErrors && state?.errors?.identifier && (
+                <p className="text-sm text-destructive">{state.errors.identifier[0]}</p>
               )}
             </div>
             <div className="flex flex-col gap-2">

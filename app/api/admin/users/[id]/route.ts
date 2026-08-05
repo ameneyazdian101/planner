@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
   const user = await prisma.user.update({
     where: { id },
     data,
-    select: { id: true, email: true, name: true, isAdmin: true, createdAt: true },
+    select: { id: true, email: true, phone: true, name: true, isAdmin: true, createdAt: true },
   });
 
   return NextResponse.json(user);

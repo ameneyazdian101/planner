@@ -10,6 +10,7 @@ import { sendPasswordResetEmail } from "@/lib/mailer";
 import {
   ForgotPasswordFormSchema,
   LoginFormSchema,
+  normalizeIdentifier,
   ResetPasswordFormSchema,
   SignupFormSchema,
   type FormState,
@@ -18,7 +19,7 @@ import {
 export async function signup(_state: FormState, formData: FormData): Promise<FormState> {
   const validatedFields = SignupFormSchema.safeParse({
     name: formData.get("name"),
-    email: formData.get("email"),
+    identifier: formData.get("identifier"),
     password: formData.get("password"),
   });
 
@@ -26,16 +27,28 @@ export async function signup(_state: FormState, formData: FormData): Promise<For
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { name, email, password } = validatedFields.data;
+  const { name, identifier, password } = validatedFields.data;
+  // Schema's refine already guarantees this parses successfully.
+  const parsed = normalizeIdentifier(identifier)!;
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findFirst({
+    where: parsed.type === "email" ? { email: parsed.value } : { phone: parsed.value },
+  });
   if (existing) {
-    return { message: "این ایمیل قبلاً ثبت شده است." };
+    return {
+      message:
+        parsed.type === "email" ? "این ایمیل قبلاً ثبت شده است." : "این شماره تلفن قبلاً ثبت شده است.",
+    };
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { name, email, passwordHash },
+    data: {
+      name,
+      email: parsed.type === "email" ? parsed.value : null,
+      phone: parsed.type === "phone" ? parsed.value : null,
+      passwordHash,
+    },
   });
 
   await createSession(user.id);
@@ -44,7 +57,7 @@ export async function signup(_state: FormState, formData: FormData): Promise<For
 
 export async function login(_state: FormState, formData: FormData): Promise<FormState> {
   const validatedFields = LoginFormSchema.safeParse({
-    email: formData.get("email"),
+    identifier: formData.get("identifier"),
     password: formData.get("password"),
   });
 
@@ -52,16 +65,22 @@ export async function login(_state: FormState, formData: FormData): Promise<Form
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { email, password } = validatedFields.data;
+  const { identifier, password } = validatedFields.data;
+  const parsed = normalizeIdentifier(identifier);
+  if (!parsed) {
+    return { message: "ایمیل/شماره تلفن یا رمز عبور اشتباه است." };
+  }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findFirst({
+    where: parsed.type === "email" ? { email: parsed.value } : { phone: parsed.value },
+  });
   if (!user) {
-    return { message: "ایمیل یا رمز عبور اشتباه است." };
+    return { message: "ایمیل/شماره تلفن یا رمز عبور اشتباه است." };
   }
 
   const passwordsMatch = await bcrypt.compare(password, user.passwordHash);
   if (!passwordsMatch) {
-    return { message: "ایمیل یا رمز عبور اشتباه است." };
+    return { message: "ایمیل/شماره تلفن یا رمز عبور اشتباه است." };
   }
 
   await createSession(user.id);
@@ -104,7 +123,7 @@ export async function requestPasswordReset(_state: FormState, formData: FormData
   const resetUrl = `${await siteOrigin()}/reset-password?token=${token}`;
 
   try {
-    await sendPasswordResetEmail(user.email, resetUrl);
+    await sendPasswordResetEmail(email, resetUrl);
   } catch (err) {
     console.error("[auth] Failed to send password reset email:", err instanceof Error ? err.stack : err);
     return { message: "ارسال ایمیل با خطا مواجه شد. کمی بعد دوباره امتحان کن." };

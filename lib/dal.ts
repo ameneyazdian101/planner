@@ -28,7 +28,7 @@ export const getCurrentUser = cache(async () => {
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, email: true, name: true, createdAt: true, isAdmin: true },
+    select: { id: true, email: true, phone: true, name: true, createdAt: true, isAdmin: true },
   });
 
   return user;
@@ -40,7 +40,7 @@ export const requireAdmin = cache(async () => {
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, email: true, name: true, isAdmin: true },
+    select: { id: true, email: true, phone: true, name: true, isAdmin: true },
   });
 
   if (!user?.isAdmin) {
