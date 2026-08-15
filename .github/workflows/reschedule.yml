@@ -1,0 +1,23 @@
+name: Task auto-reschedule
+
+on:
+  schedule:
+    # 20:35 UTC = 00:05 Iran time (Iran no longer observes DST, fixed UTC+3:30)
+    - cron: "35 20 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger overdue-task reschedule
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X GET "https://planner-vmdv-eight.vercel.app/api/cron/reschedule" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          status="${response##*$'\n'}"
+          body="${response%$'\n'*}"
+          echo "HTTP status: $status"
+          echo "Response body: $body"
+          if [ "$status" -ne 200 ]; then
+            exit 1
+          fi

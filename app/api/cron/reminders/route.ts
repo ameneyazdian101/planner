@@ -1,27 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { dayRangeForKey } from "@/lib/date";
+import { dayRangeForKey, todayKeyInTehran } from "@/lib/date";
 import { isExpiredSubscriptionError, sendPushNotification } from "@/lib/push";
 
 const REMINDER_LEAD_MINUTES = 10;
 
-/** Vercel's runtime clock is UTC; task times are plain HH:mm entered as Iran wall-clock time. */
+/** Task times are plain HH:mm entered as Iran wall-clock time. */
 function nowInIran(): { dateKey: string; hhmm: string } {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const hhmm = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Tehran",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).formatToParts(new Date());
+  }).format(new Date());
 
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return {
-    dateKey: `${get("year")}-${get("month")}-${get("day")}`,
-    hhmm: `${get("hour")}:${get("minute")}`,
-  };
+  return { dateKey: todayKeyInTehran(), hhmm };
 }
 
 export async function GET(request: NextRequest) {
