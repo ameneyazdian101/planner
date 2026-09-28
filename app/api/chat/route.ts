@@ -217,6 +217,27 @@ function isRetryableGroqError(error: unknown): boolean {
   return status === 429 || status === 503 || status === 500;
 }
 
+/**
+ * Worth switching to the next model: this one was retired by Groq, or its
+ * (per-model) rate limit is still exhausted after retrying.
+ */
+function shouldFallBackToNextModel(error: unknown): boolean {
+  const e = error as { status?: number; error?: { error?: { code?: string } } } | undefined;
+  const code = e?.error?.error?.code;
+  return (
+    e?.status === 404 ||
+    e?.status === 429 ||
+    code === "model_not_found" ||
+    code === "model_decommissioned"
+  );
+}
+
+// Tried in order; Groq retires models periodically, so a working fallback
+// keeps the assistant up until GROQ_MODEL is updated.
+const GROQ_MODELS = [
+  ...new Set([process.env.GROQ_MODEL || "openai/gpt-oss-120b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"]),
+];
+
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -573,21 +594,35 @@ export async function POST(request: NextRequest) {
   const MAX_TOOL_ROUNDS = 5;
   const MAX_RETRIES = 3;
 
+  // Sticky across tool rounds, so once a model fails we don't keep hitting it.
+  let modelIndex = 0;
+
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       let completion;
       for (let attempt = 0; ; attempt++) {
+        const model = GROQ_MODELS[modelIndex];
         try {
           completion = await groq.chat.completions.create({
-            model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+            model,
             messages,
             tools: groqTools,
             tool_choice: "auto",
           });
           break;
         } catch (err) {
-          if (attempt >= MAX_RETRIES - 1 || !isRetryableGroqError(err)) throw err;
-          await sleep(500 * 2 ** attempt);
+          const retryable = isRetryableGroqError(err);
+          if (retryable && attempt < MAX_RETRIES - 1) {
+            await sleep(500 * 2 ** attempt);
+            continue;
+          }
+          if (shouldFallBackToNextModel(err) && modelIndex < GROQ_MODELS.length - 1) {
+            console.warn(`[chat] Groq model ${model} failed, falling back:`, err instanceof Error ? err.message : err);
+            modelIndex++;
+            attempt = -1;
+            continue;
+          }
+          throw err;
         }
       }
 
